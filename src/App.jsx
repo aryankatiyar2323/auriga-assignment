@@ -4,8 +4,10 @@ import {
   Check,
   ChevronDown,
   CircleDollarSign,
+  Moon,
   Plus,
   Receipt,
+  Sun,
   Trash2,
   Users,
   WalletCards,
@@ -23,7 +25,128 @@ const initialParticipants = [
 function formatCurrency(amount) {
   return `₹${Math.abs(amount).toLocaleString("en-IN")}`;
 }
+function normalizeName(name) {
+  return name
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLowerCase()
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
 
+function parseAmount(value) {
+  if (value === undefined || value === null) return null;
+
+  const cleaned = String(value)
+    .replace(/₹/g, "")
+    .replace(/rs\.?/gi, "")
+    .replace(/,/g, "")
+    .trim();
+
+  if (!cleaned || !/^\d+(\.\d{1,2})?$/.test(cleaned)) {
+    return null;
+  }
+
+  const amount = Number(cleaned);
+
+  return amount > 0 ? amount : null;
+}
+
+function processContributionImport(text) {
+  const rows = text
+    .split(/\r?\n/)
+    .map((row) => row.trim())
+    .filter(Boolean);
+
+  const valid = [];
+  const rejected = [];
+  const duplicates = [];
+
+  const seen = new Set();
+
+  rows.forEach((row, index) => {
+    const parts = row.split(",");
+
+    if (parts.length < 2) {
+      rejected.push({
+        row: index + 1,
+        value: row,
+        reason: "Missing name or amount",
+      });
+      return;
+    }
+
+    const rawName = parts[0].trim();
+    const rawAmount = parts.slice(1).join(",").trim();
+
+    if (!rawName) {
+      rejected.push({
+        row: index + 1,
+        value: row,
+        reason: "Missing participant name",
+      });
+      return;
+    }
+
+    const amount = parseAmount(rawAmount);
+
+    if (amount === null) {
+      rejected.push({
+        row: index + 1,
+        value: row,
+        reason: "Invalid amount",
+      });
+      return;
+    }
+
+    const name = normalizeName(rawName);
+    const duplicateKey = `${name}|${amount}`;
+
+    if (seen.has(duplicateKey)) {
+      duplicates.push({
+        row: index + 1,
+        name,
+        amount,
+      });
+      return;
+    }
+
+    seen.add(duplicateKey);
+
+    valid.push({
+      name,
+      amount,
+    });
+  });
+
+  const mergedMap = new Map();
+
+  valid.forEach((entry) => {
+    if (!mergedMap.has(entry.name)) {
+      mergedMap.set(entry.name, {
+        name: entry.name,
+        amount: entry.amount,
+        entries: 1,
+      });
+    } else {
+      const existing = mergedMap.get(entry.name);
+
+      existing.amount += entry.amount;
+      existing.entries += 1;
+    }
+  });
+
+  const merged = Array.from(mergedMap.values()).filter(
+    (entry) => entry.entries > 1
+  );
+
+  return {
+    valid: Array.from(mergedMap.values()),
+    rejected,
+    duplicates,
+    merged,
+    totalRows: rows.length,
+  };
+}
 function calculateSettlements(participants, share) {
   const creditors = participants
     .map((person) => ({
@@ -71,6 +194,55 @@ function calculateSettlements(participants, share) {
 function App() {
   const savedPool = JSON.parse(localStorage.getItem("giftpool-data") || "null");
 
+  const [theme, setTheme] = useState(
+    () => localStorage.getItem("giftpool-theme") || "light"
+  );
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+    localStorage.setItem("giftpool-theme", theme);
+  }, [theme]);
+
+  const toggleTheme = (event) => {
+    const next = theme === "light" ? "dark" : "light";
+
+    const prefersReducedMotion = window.matchMedia(
+      "(prefers-reduced-motion: reduce)"
+    ).matches;
+
+    // Fall back instantly if the browser can't animate the transition,
+    // or the person has asked for reduced motion.
+    if (!document.startViewTransition || prefersReducedMotion) {
+      setTheme(next);
+      return;
+    }
+
+    const x = event.clientX;
+    const y = event.clientY;
+    const endRadius = Math.hypot(
+      Math.max(x, window.innerWidth - x),
+      Math.max(y, window.innerHeight - y)
+    );
+
+    const transition = document.startViewTransition(() => setTheme(next));
+
+    transition.ready.then(() => {
+      document.documentElement.animate(
+        {
+          clipPath: [
+            `circle(0px at ${x}px ${y}px)`,
+            `circle(${endRadius}px at ${x}px ${y}px)`,
+          ],
+        },
+        {
+          duration: 600,
+          easing: "cubic-bezier(0.4, 0, 0.2, 1)",
+          pseudoElement: "::view-transition-new(root)",
+        }
+      );
+    });
+  };
+
   const [poolName, setPoolName] = useState(
     savedPool?.poolName || "Manager Farewell Gift"
   );
@@ -83,13 +255,17 @@ function App() {
     savedPool?.participants || initialParticipants
   );
 
-  const [payments, setPayments] = useState(savedPool?.payments || []);
   const [showAdd, setShowAdd] = useState(false);
   const [newName, setNewName] = useState("");
   const [newPayment, setNewPayment] = useState("");
+  const [payments, setPayments] = useState(savedPool?.payments || []);
+
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
   const [paymentParticipant, setPaymentParticipant] = useState("");
   const [paymentAmount, setPaymentAmount] = useState("");
+  const [importText, setImportText] = useState("");
+  const [importResult, setImportResult] = useState(null);
 
   useEffect(() => {
     localStorage.setItem(
@@ -196,9 +372,29 @@ function App() {
           </div>
         </div>
 
-        <div className="header-status">
-          <span className="status-dot" />
-          Pool is active
+        <div className="topbar-right">
+          <div className="header-status">
+            <span className="status-dot" />
+            Pool is active
+          </div>
+
+          <button
+            type="button"
+            className="theme-toggle"
+            onClick={toggleTheme}
+            aria-label={
+              theme === "light" ? "Switch to dark mode" : "Switch to light mode"
+            }
+            title={
+              theme === "light" ? "Switch to dark mode" : "Switch to light mode"
+            }
+          >
+            <span className="theme-toggle-track">
+              <span className="theme-toggle-thumb">
+                {theme === "light" ? <Sun size={13} /> : <Moon size={13} />}
+              </span>
+            </span>
+          </button>
         </div>
       </header>
 
@@ -289,6 +485,14 @@ function App() {
               </div>
 
               <div className="panel-actions">
+                <button
+                  className="secondary-button"
+                  onClick={() => setShowImportModal(true)}
+                >
+                  <Receipt size={17} />
+                  Import contributions
+                </button>
+
                 <button
                   className="secondary-button"
                   onClick={() => setShowPaymentModal(true)}
@@ -524,6 +728,112 @@ function App() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {showImportModal && (
+        <div
+          className="modal-overlay"
+          onClick={() => setShowImportModal(false)}
+        >
+          <div
+            className="payment-modal import-modal"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="modal-header">
+              <div>
+                <span className="modal-eyebrow">IMPORT DATA</span>
+                <h3>Import contributions</h3>
+                <p>Paste rows of name, amount to add or update people at once.</p>
+              </div>
+
+              <button
+                className="modal-close"
+                onClick={() => setShowImportModal(false)}
+                aria-label="Close modal"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="form-group">
+              <label>Paste contribution records</label>
+
+              <textarea
+                className="import-textarea"
+                value={importText}
+                onChange={(e) => {
+                  setImportText(e.target.value);
+                  setImportResult(null);
+                }}
+                placeholder={`Example:
+Rahul, ₹1,500
+rahul , 1500
+PRIYA, 500
+Karan, ₹1,000
+Priya, 500
+Unknown, abc`}
+                rows={9}
+              />
+
+              <p className="form-hint">
+                Use one contribution per line in the format: Name, Amount
+              </p>
+            </div>
+
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="cancel-button"
+                onClick={() => {
+                  setShowImportModal(false);
+                  setImportResult(null);
+                }}
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                className="primary-button"
+                onClick={() => {
+                  const result = processContributionImport(importText);
+                  setImportResult(result);
+                }}
+              >
+                <Receipt size={16} />
+                Process import
+              </button>
+            </div>
+
+            {importResult && (
+              <div className="import-result">
+                <div className="import-summary">
+                  <div>
+                    <strong>{importResult.valid.length}</strong>
+                    <span>Imported</span>
+                  </div>
+
+                  <div>
+                    <strong>{importResult.duplicates.length}</strong>
+                    <span>Duplicates</span>
+                  </div>
+
+                  <div>
+                    <strong>{importResult.merged.length}</strong>
+                    <span>Merged</span>
+                  </div>
+
+                  <div>
+                    <strong>{importResult.rejected.length}</strong>
+                    <span>Rejected</span>
+                  </div>
+                </div>
+
+                <p>Processed {importResult.totalRows} contribution rows.</p>
+              </div>
+            )}
           </div>
         </div>
       )}
