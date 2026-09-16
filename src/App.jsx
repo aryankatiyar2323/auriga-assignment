@@ -5,9 +5,11 @@ import {
   ChevronDown,
   CircleDollarSign,
   Plus,
+  Receipt,
   Trash2,
   Users,
   WalletCards,
+  X,
 } from "lucide-react";
 import "./App.css";
 
@@ -80,9 +82,14 @@ function App() {
   const [participants, setParticipants] = useState(
     savedPool?.participants || initialParticipants
   );
+
+  const [payments, setPayments] = useState(savedPool?.payments || []);
   const [showAdd, setShowAdd] = useState(false);
   const [newName, setNewName] = useState("");
   const [newPayment, setNewPayment] = useState("");
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [paymentParticipant, setPaymentParticipant] = useState("");
+  const [paymentAmount, setPaymentAmount] = useState("");
 
   useEffect(() => {
     localStorage.setItem(
@@ -91,9 +98,10 @@ function App() {
         poolName,
         budget,
         participants,
+        payments,
       })
     );
-  }, [poolName, budget, participants]);
+  }, [poolName, budget, participants, payments]);
 
   const share = participants.length ? budget / participants.length : 0;
 
@@ -129,6 +137,7 @@ function App() {
     setShowAdd(false);
   };
 
+
   const updatePayment = (id, value) => {
     setParticipants((current) =>
       current.map((person) =>
@@ -144,7 +153,36 @@ function App() {
       current.filter((person) => person.id !== id)
     );
   };
+  const addPayment = (participantId, amount) => {
+    const participant = participants.find(
+      (person) => person.id === participantId
+    );
 
+    if (!participant || amount <= 0) return;
+
+    const payment = {
+      id: Date.now(),
+      name: participant.name,
+      participantId,
+      amount: Number(amount),
+      date: new Date().toISOString().split("T")[0],
+    };
+
+    setPayments((current) => [...current, payment]);
+  };
+  const handleRecordPayment = (event) => {
+    event.preventDefault();
+
+    const amount = Number(paymentAmount);
+
+    if (!paymentParticipant || amount <= 0) return;
+
+    addPayment(Number(paymentParticipant), amount);
+
+    setPaymentParticipant("");
+    setPaymentAmount("");
+    setShowPaymentModal(false);
+  };
   return (
     <div className="app">
       <header className="topbar">
@@ -250,13 +288,23 @@ function App() {
                 <h3>Who's contributing</h3>
               </div>
 
-              <button
-                className="primary-button"
-                onClick={() => setShowAdd((value) => !value)}
-              >
-                <Plus size={17} />
-                Add person
-              </button>
+              <div className="panel-actions">
+                <button
+                  className="secondary-button"
+                  onClick={() => setShowPaymentModal(true)}
+                >
+                  <Receipt size={17} />
+                  Record payment
+                </button>
+
+                <button
+                  className="primary-button"
+                  onClick={() => setShowAdd((value) => !value)}
+                >
+                  <Plus size={17} />
+                  Add person
+                </button>
+              </div>
             </div>
 
             {showAdd && (
@@ -316,15 +364,14 @@ function App() {
                     />
 
                     <span
-                      className={`balance ${
-                        isOwed ? "owe" : isCredit ? "credit" : "settled"
-                      }`}
+                      className={`balance ${isOwed ? "owe" : isCredit ? "credit" : "settled"
+                        }`}
                     >
                       {isOwed
                         ? `Owes ${formatCurrency(balance)}`
                         : isCredit
-                        ? `+${formatCurrency(balance)}`
-                        : "Settled"}
+                          ? `+${formatCurrency(balance)}`
+                          : "Settled"}
                     </span>
 
                     <button
@@ -395,6 +442,91 @@ function App() {
           </aside>
         </div>
       </main>
+
+      {showPaymentModal && (
+        <div
+          className="modal-overlay"
+          onClick={() => setShowPaymentModal(false)}
+        >
+          <div
+            className="payment-modal"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="modal-header">
+              <div>
+                <span className="modal-eyebrow">PAYMENT HISTORY</span>
+                <h3>Record payment</h3>
+                <p>Record a contribution made by a participant.</p>
+              </div>
+
+              <button
+                className="modal-close"
+                onClick={() => setShowPaymentModal(false)}
+                aria-label="Close modal"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleRecordPayment}>
+              <div className="form-group">
+                <label>Paid by</label>
+
+                <select
+                  value={paymentParticipant}
+                  onChange={(event) =>
+                    setPaymentParticipant(event.target.value)
+                  }
+                  required
+                >
+                  <option value="">Select participant</option>
+
+                  {participants.map((person) => (
+                    <option key={person.id} value={person.id}>
+                      {person.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label>Amount</label>
+
+                <div className="amount-input">
+                  <span>₹</span>
+
+                  <input
+                    type="number"
+                    min="1"
+                    step="1"
+                    placeholder="Enter amount"
+                    value={paymentAmount}
+                    onChange={(event) =>
+                      setPaymentAmount(event.target.value)
+                    }
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="modal-actions">
+                <button
+                  type="button"
+                  className="cancel-button"
+                  onClick={() => setShowPaymentModal(false)}
+                >
+                  Cancel
+                </button>
+
+                <button type="submit" className="primary-button">
+                  <Receipt size={16} />
+                  Record payment
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

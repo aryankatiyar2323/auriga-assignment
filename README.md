@@ -42,3 +42,5 @@ Clone the repository:
 ```bash
 git clone https://github.com/aryankatiyar2323/auriga-assignment
 cd auriga-assignment
+cd auriga-assignment
+
