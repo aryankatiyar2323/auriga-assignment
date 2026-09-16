@@ -1,16 +1,44 @@
-# React + Vite
+# GiftPool — Group Gift Settlement Manager
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+GiftPool is a lightweight web application for managing shared group contributions and settling expenses fairly.
 
-Currently, two official plugins are available:
+It was built for the Auriga IT Round 2 Build Round based on the problem of managing contributions toward a common farewell gift.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Features
 
-## React Compiler
+- Create and manage a gift pool
+- Set a custom pool name and budget
+- Add and remove participants
+- Calculate equal contribution shares automatically
+- Track individual contributions
+- Record payments
+- Support partial payments and overpayments
+- View total amount collected
+- View remaining amount to be collected
+- Track collection progress
+- View individual participant balances
+- Generate simplified settlement suggestions showing who should pay whom
+- Persist pool data using browser Local Storage
+- Responsive and clean user interface
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Tech Stack
 
-## Expanding the Oxlint configuration
+- React
+- Vite
+- JavaScript
+- CSS
+- Lucide React
+- Browser Local Storage
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+## Requirements
+
+- Node.js 18 or later
+- npm
+
+## Project Setup
+
+Clone the repository:
+
+```bash
+git clone https://github.com/aryankatiyar2323/auriga-assignment
+cd auriga-assignment
