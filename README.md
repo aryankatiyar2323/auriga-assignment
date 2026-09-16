@@ -37,7 +37,7 @@ It was built for the Auriga IT Round 2 Build Round based on the problem of manag
 
 ## Live Demo at VERCEL:
 
--Visit the link: https://auriga-assignment.vercel.app/
+- Visit the link: https://auriga-assignment.vercel.app/
 
 ## Project Setup
 
