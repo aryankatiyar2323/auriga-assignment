@@ -35,6 +35,10 @@ It was built for the Auriga IT Round 2 Build Round based on the problem of manag
 - Node.js 18 or later
 - npm
 
+## Live Demo at VERCEL:
+
+-Visit the link: https://auriga-assignment.vercel.app/
+
 ## Project Setup
 
 Clone the repository:
@@ -42,5 +46,6 @@ Clone the repository:
 ```bash
 git clone https://github.com/aryankatiyar2323/auriga-assignment
 cd auriga-assignment
-cd auriga-assignment
+
+
 
